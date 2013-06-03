@@ -4,6 +4,7 @@
 # YapDi - Yet another python Daemon implementation <https://github.com/kasun/YapDi>
 # Author Kasun Herath <kasunh01@gmail.com> 
 #
+# Python 3 compatibility by Anton Osten <anton@ostensible.me>
 '''
 
 from signal import SIGTERM
@@ -15,6 +16,14 @@ OPERATION_FAILED = 1
 INSTANCE_ALREADY_RUNNING = 2
 INSTANCE_NOT_RUNNING = 3
 SET_USER_FAILED = 4
+
+# python 2 and 3 compatibility
+pyversion = sys.version_info[0]
+
+if pyversion is 2:
+    no_file_error = IOError
+else:
+    no_file_error = FileNotFoundError
 
 class Daemon:
     def __init__(self, pidfile=None, stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
@@ -40,7 +49,7 @@ class Daemon:
             if pid > 0:
                 # exit first parent
                 sys.exit(0) 
-        except OSError, e: 
+        except OSError as e: 
             return OPERATION_FAILED
 
         # decouple from parent environment
@@ -53,15 +62,15 @@ class Daemon:
             if pid > 0:
                 # exit from second parent
                 sys.exit(0) 
-        except OSError, e: 
+        except OSError as e: 
             return OPERATION_FAILED
 
         # redirect standard file descriptors
         sys.stdout.flush()
         sys.stderr.flush()
-        si = file(self.stdin, 'r')
-        so = file(self.stdout, 'a+')
-        se = file(self.stderr, 'a+', 0)
+        si = open(self.stdin)
+        so = open(self.stdout, 'a+')
+        se = open(self.stderr, 'a+')
         os.dup2(si.fileno(), sys.stdin.fileno())
         os.dup2(so.fileno(), sys.stdout.fileno())
         os.dup2(se.fileno(), sys.stderr.fileno())
@@ -69,16 +78,18 @@ class Daemon:
         # write pidfile
         atexit.register(self.delpid)
         pid = str(os.getpid())
-        file(self.pidfile,'w+').write("%s\n" % pid)
+        
+        with open(self.pidfile, 'w+') as file:      
+            file.write("%s\n" % pid)
     
         # If daemon user is set change current user to self.daemon_user
         if self.daemon_user:
             try:
                 uid = pwd.getpwnam(self.daemon_user)[2]
                 os.setuid(uid)
-            except NameError, e:
+            except NameError as e:
                 return SET_USER_FAILED
-            except OSError, e:
+            except OSError as e:
                 return SET_USER_FAILED
         return OPERATION_SUCCESSFUL
 
@@ -97,7 +108,7 @@ class Daemon:
             while 1:
                 os.kill(pid, SIGTERM)
                 time.sleep(0.1)
-        except OSError, err:
+        except OSError as err:
             err = str(err)
             if err.find("No such process") > 0:
                 if os.path.exists(self.pidfile):
@@ -117,10 +128,10 @@ class Daemon:
     def status(self):
         ''' check whether an instance is already running. If running return pid or else False '''
         try:
-            pf = file(self.pidfile,'r')
+            pf = open(self.pidfile)
             pid = int(pf.read().strip())
             pf.close()
-        except IOError:
+        except no_file_error:
             pid = None
         return pid
 

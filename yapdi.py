@@ -10,6 +10,7 @@
 from signal import SIGTERM
 import sys, atexit, os, pwd
 import time
+from warnings import warn
 
 OPERATION_SUCCESSFUL = 0
 OPERATION_FAILED = 1
@@ -45,6 +46,7 @@ class Daemon:
     def daemonize(self):
         ''' Daemonize the current process and return '''
         if self.status():
+            warn('YapDi: instance is already running', RuntimeWarning)
             return INSTANCE_ALREADY_RUNNING
         try: 
             pid = os.fork() 
@@ -105,7 +107,7 @@ class Daemon:
         if not pid:
             return INSTANCE_NOT_RUNNING
 
-        # Try killing the daemon process	
+        # Try killing the daemon process    
         try:
             while 1:
                 os.kill(pid, SIGTERM)
@@ -133,13 +135,13 @@ class Daemon:
             pf = open(self.pidfile)
             pid = int(pf.read().strip())
 
-            # check if it is actually running
+            # check if it is actually running or even exists
             try:
                 os.kill(pid, 0)
             except no_process_error:
                 os.remove(self.pidfile)
                 pid = None
-                
+
         except no_file_error:
             pid = None
         return pid

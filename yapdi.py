@@ -22,8 +22,10 @@ pyversion = sys.version_info[0]
 
 if pyversion is 2:
     no_file_error = IOError
+    no_process_error = OSError
 else:
     no_file_error = FileNotFoundError
+    no_process_error = ProcessLookupError
 
 class Daemon:
     def __init__(self, pidfile=None, stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
@@ -108,9 +110,9 @@ class Daemon:
             while 1:
                 os.kill(pid, SIGTERM)
                 time.sleep(0.1)
-        except OSError as err:
+        except no_process_error as err:
             err = str(err)
-            if err.find("No such process") > 0:
+            if "No such process" in err:
                 if os.path.exists(self.pidfile):
                     os.remove(self.pidfile)
             else:
@@ -130,7 +132,14 @@ class Daemon:
         try:
             pf = open(self.pidfile)
             pid = int(pf.read().strip())
-            pf.close()
+
+            # check if it is actually running
+            try:
+                os.kill(pid, 0)
+            except no_process_error:
+                os.remove(self.pidfile)
+                pid = None
+                
         except no_file_error:
             pid = None
         return pid
